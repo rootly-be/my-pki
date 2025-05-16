@@ -1,0 +1,5 @@
+
+
+create-ca.sh -p MonSuperSecret
+
+sign-host.sh   -n npm.mgmt.rootly.local   -p MonSuperSecret
