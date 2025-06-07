@@ -1,0 +1,464 @@
+openapi: 3.0.3
+info:
+  title: Certificate Authority Manager API
+  description: |
+    A comprehensive API for managing Certificate Authorities (CA) and SSL/TLS certificates.
+    This API provides endpoints for creating CAs, signing host certificates, and managing certificate files.
+  version: 1.0.0
+  contact:
+    name: Certificate Manager
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000
+    description: Development server
+  - url: https://yourdomain.com
+    description: Production server
+
+tags:
+  - name: Certificate Authority
+    description: CA management operations
+  - name: Certificates
+    description: Certificate management operations
+  - name: File Operations
+    description: File upload and download operations
+
+paths:
+  /api/ca/status:
+    get:
+      tags:
+        - Certificate Authority
+      summary: Get CA status
+      description: Check if Certificate Authority exists and get CA information
+      responses:
+        '200':
+          description: CA status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+                    description: Whether both CA key and certificate exist
+                  caKeyExists:
+                    type: boolean
+                    description: Whether CA private key exists
+                  caCertExists:
+                    type: boolean
+                    description: Whether CA certificate exists
+                  caInfo:
+                    type: string
+                    nullable: true
+                    description: CA certificate information (OpenSSL text output)
+              example:
+                exists: true
+                caKeyExists: true
+                caCertExists: true
+                caInfo: "Certificate:\n    Data:\n        Version: 3 (0x2)..."
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ca/list:
+    get:
+      tags:
+        - Certificate Authority
+      summary: List all available CAs
+      description: Get a list of all Certificate Authorities with their details
+      responses:
+        '200':
+          description: List of CAs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: CA identifier
+                    subject:
+                      type: string
+                      description: CA certificate subject
+                    expires:
+                      type: string
+                      description: CA expiration date
+                    exists:
+                      type: boolean
+                      description: Whether CA files exist
+              example:
+                - id: "default"
+                  subject: "CN=rootly network, O=rootly, OU=IT"
+                  expires: "Dec 31 23:59:59 2034 GMT"
+                  exists: true
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ca/create:
+    post:
+      tags:
+        - Certificate Authority
+      summary: Create a new Certificate Authority
+      description: Create a new CA with the specified parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  description: Password to encrypt the CA private key
+                  minLength: 8
+                caId:
+                  type: string
+                  description: CA identifier (default: 'default')
+                  pattern: '^[a-zA-Z0-9-_]+$'
+                  default: "default"
+                commonName:
+                  type: string
+                  description: Certificate common name
+                  default: "rootly network"
+                organization:
+                  type: string
+                  description: Organization name
+                  default: "rootly"
+                organizationalUnit:
+                  type: string
+                  description: Organizational unit
+                  default: "IT"
+                validityDays:
+                  type: integer
+                  description: Certificate validity in days
+                  minimum: 1
+                  maximum: 36500
+                  default: 3650
+            example:
+              password: "secure-password-123"
+              caId: "production-ca"
+              commonName: "Production Root CA"
+              organization: "My Company"
+              organizationalUnit: "IT Security"
+              validityDays: 3650
+      responses:
+        '200':
+          description: CA created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  output:
+                    type: string
+                    description: Script execution output
+                  caId:
+                    type: string
+                    description: Created CA identifier
+              example:
+                message: "CA 'production-ca' created successfully"
+                output: "Generating RSA private key..."
+                caId: "production-ca"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ca/download:
+    get:
+      tags:
+        - Certificate Authority
+      summary: Download CA certificate
+      description: Download the CA certificate file
+      responses:
+        '200':
+          description: CA certificate file
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: CA certificate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/certificates:
+    get:
+      tags:
+        - Certificates
+      summary: List all certificates
+      description: Get a list of all signed certificates with their information
+      responses:
+        '200':
+          description: List of certificates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    hostname:
+                      type: string
+                      description: Certificate hostname/domain
+                    certFile:
+                      type: string
+                      description: Certificate filename
+                    keyExists:
+                      type: boolean
+                      description: Whether private key file exists
+                    fullchainExists:
+                      type: boolean
+                      description: Whether fullchain certificate exists
+                    certInfo:
+                      type: string
+                      description: Certificate information (OpenSSL text output)
+              example:
+                - hostname: "example.local"
+                  certFile: "example.local.crt"
+                  keyExists: true
+                  fullchainExists: true
+                  certInfo: "Certificate:\n    Data:\n        Version: 3 (0x2)..."
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/certificates/sign:
+    post:
+      tags:
+        - Certificates
+      summary: Sign a new certificate
+      description: Create and sign a new host certificate using the specified CA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hostname
+                - password
+              properties:
+                hostname:
+                  type: string
+                  description: Hostname or domain for the certificate
+                  pattern: '^[a-zA-Z0-9.-]+$'
+                password:
+                  type: string
+                  description: CA private key password
+                caId:
+                  type: string
+                  description: CA identifier to use for signing
+                  pattern: '^[a-zA-Z0-9-_]+$'
+                  default: "default"
+                validityDays:
+                  type: integer
+                  description: Certificate validity in days
+                  minimum: 1
+                  maximum: 3650
+                  default: 825
+            example:
+              hostname: "api.example.com"
+              password: "ca-password-123"
+              caId: "production-ca"
+              validityDays: 365
+      responses:
+        '200':
+          description: Certificate signed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  output:
+                    type: string
+                    description: Script execution output
+                  caId:
+                    type: string
+                    description: CA used for signing
+              example:
+                message: "Certificate for 'api.example.com' signed successfully with CA 'production-ca'"
+                output: "Generating private key..."
+                caId: "production-ca"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/certificates/{hostname}/download/{type}:
+    get:
+      tags:
+        - Certificates
+      summary: Download certificate files
+      description: Download certificate, private key, or fullchain file for a specific hostname
+      parameters:
+        - name: hostname
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Certificate hostname
+          example: "example.local"
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [cert, key, fullchain]
+          description: Type of file to download
+          example: "cert"
+      responses:
+        '200':
+          description: Certificate file
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid file type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/upload/{type}:
+    post:
+      tags:
+        - File Operations
+      summary: Upload certificate or CA files
+      description: Upload CA or certificate files to the server
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [ca, cert]
+          description: Type of files being uploaded
+          example: "ca"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Files to upload
+            encoding:
+              files:
+                contentType: application/x-pem-file, application/octet-stream
+      responses:
+        '200':
+          description: Files uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  uploadedFiles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        filename:
+                          type: string
+                        size:
+                          type: integer
+                        path:
+                          type: string
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    description: Upload errors (if any)
+              example:
+                message: "Successfully uploaded 2 file(s)"
+                uploadedFiles:
+                  - filename: "root_ca.crt"
+                    size: 1024
+                    path: "/app/ca/root_ca.crt"
+                  - filename: "root_ca.key"
+                    size: 2048
+                    path: "/app/ca/root_ca.key"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error details
+      example:
+        error: "Invalid file type"
+        details: "Expected .crt, .key, or .pem file"
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Password is required"
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Failed to create CA"
+            details: "Script execution failed"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (if implemented)
+
+security: []

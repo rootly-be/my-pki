@@ -1,2 +1,4 @@
 ca
 certs
+ca-data/*
+cert-data/*

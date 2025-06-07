@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  certificate-manager:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount CA directory (contains root_ca.key and root_ca.crt)
+      - ./ca-data:/app/ca
+      # Mount certificates directory (contains signed certificates)
+      - ./cert-data:/app/certs
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/ca/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  ca-data:
+    driver: local
+  cert-data:
+    driver: local

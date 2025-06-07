@@ -11,6 +11,7 @@ Usage: $0 -n HOSTNAME -p PASS [options]
 Options :
   -n HOSTNAME   Nom d'hôte à signer (ex. homepage.mgmt.rootly.local)
   -p PASS       Mot de passe de la clé CA (obligatoire)
+  -i CA_ID      Identifiant de la CA à utiliser (défaut : "default")
   -d CA_DIR     Répertoire racine de la CA (défaut : \$HOME/my-pki/ca)
   -c OUT_DIR    Répertoire de sortie des certificats (défaut : \$HOME/my-pki/certs)
   -v DAYS       Durée de validité du certificat (défaut : 825 jours)
@@ -22,15 +23,17 @@ EOF
 # valeurs par défaut
 CA_DIR="${HOME}/my-pki/ca"
 OUT_DIR="${HOME}/my-pki/certs"
+CA_ID="default"
 DAYS_CERT=825
 
 # parse args
 HOSTNAME=""
 PASS=""
-while getopts "n:p:d:c:v:h" opt; do
+while getopts "n:p:i:d:c:v:h" opt; do
   case "$opt" in
     n) HOSTNAME="$OPTARG" ;;
     p) PASS="$OPTARG"      ;;
+    i) CA_ID="$OPTARG"     ;;
     d) CA_DIR="$OPTARG"    ;;
     c) OUT_DIR="$OPTARG"   ;;
     v) DAYS_CERT="$OPTARG" ;;
@@ -46,14 +49,23 @@ if [[ -z "$HOSTNAME" || -z "$PASS" ]]; then
   usage
 fi
 
-# chemins
-CA_KEY="${CA_DIR}/root_ca.key"
-CA_CERT="${CA_DIR}/root_ca.crt"
-SERIAL_FILE="${CA_DIR}/root_ca.srl"
+# chemins avec support multi-CA
+CA_SUBDIR="${CA_DIR}/${CA_ID}"
+CA_KEY="${CA_SUBDIR}/${CA_ID}_ca.key"
+CA_CERT="${CA_SUBDIR}/${CA_ID}_ca.crt"
+SERIAL_FILE="${CA_SUBDIR}/${CA_ID}_ca.srl"
+
+# fallback pour compatibilité avec l'ancien système
+if [[ "$CA_ID" == "default" && ! -f "$CA_KEY" ]]; then
+  CA_KEY="${CA_DIR}/root_ca.key"
+  CA_CERT="${CA_DIR}/root_ca.crt"
+  SERIAL_FILE="${CA_DIR}/root_ca.srl"
+fi
 
 # check CA files
 if [[ ! -f "$CA_KEY" || ! -f "$CA_CERT" ]]; then
-  echo "❌ Impossible de trouver la CA dans $CA_DIR (root_ca.key et root_ca.crt)." >&2
+  echo "❌ Impossible de trouver la CA '${CA_ID}' dans ${CA_SUBDIR} ou ${CA_DIR}." >&2
+  echo "   Vérifiez que la CA existe ou créez-la avec create-ca.sh -i ${CA_ID}" >&2
   exit 1
 fi
 
@@ -68,7 +80,7 @@ CRT_FILE="${OUT_DIR}/${HOSTNAME}.crt"
 FULLCHAIN="${OUT_DIR}/${HOSTNAME}_fullchain.crt"
 EXTFILE="$(mktemp)"
 
-echo "👉 Génération pour ${HOSTNAME}"
+echo "👉 Génération pour ${HOSTNAME} avec CA '${CA_ID}'"
 echo "   Clé : $KEY_FILE"
 echo "   Certificat : $CRT_FILE"
 echo "   Fullchain : $FULLCHAIN"

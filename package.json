@@ -1,0 +1,26 @@
+{
+  "name": "certificate-authority-manager",
+  "version": "1.0.0",
+  "description": "Certificate Authority Management Application",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "cd client && npm run build",
+    "install-client": "cd client && npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "child_process": "^1.0.2",
+    "fs-extra": "^11.1.1",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["certificate", "authority", "ssl", "tls", "pki"],
+  "author": "Certificate Manager",
+  "license": "MIT"
+}
