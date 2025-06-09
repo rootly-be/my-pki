@@ -119,6 +119,36 @@ docker run -p 5000:5000 \
   certificate-authority-manager
 ```
 
+## Container Images
+
+The application is available as pre-built container images on multiple registries:
+
+### Docker Hub
+```bash
+docker pull [DOCKERHUB_USERNAME]/certificate-authority-manager:latest
+```
+
+### GitHub Container Registry (GHCR)
+```bash
+docker pull ghcr.io/[REPOSITORY]/certificate-authority-manager:latest
+```
+
+**Note:** Replace `[DOCKERHUB_USERNAME]` and `[REPOSITORY]` with the actual values for your setup.
+
+### Using GHCR Image with Docker Compose
+
+To use the GHCR image instead of building locally, modify your `docker-compose.yml`:
+
+```yaml
+services:
+  certificate-manager:
+    image: ghcr.io/[REPOSITORY]/certificate-authority-manager:latest
+    # Remove the 'build: .' line
+    ports:
+      - "5000:5000"
+    # ... rest of configuration
+```
+
 ## Environment Variables
 
 - `PORT` - Server port (default: 5000)
